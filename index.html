@@ -1,0 +1,497 @@
+<!doctype html> 
+<html lang="en"> 
+<head> 
+	<meta charset="UTF-8" />
+    <title>Phaser test</title>
+    <canvas id="canvas" width="100" height="100" style="position: absolute; left: 0; top: 0; z-index: -1;"></canvas>
+    <div id="game"></div>
+	
+    <style type="text/css">
+        body {
+            margin: 0;
+        }
+    </style>
+
+<!-- vertex shader -->
+<script id="3d-vertex-shader" type="x-shader/x-vertex">
+attribute vec4 a_position;
+attribute vec2 a_texcoord;
+
+uniform mat4 u_matrix;
+
+varying vec2 v_texcoord;
+
+void main() {
+  // Multiply the position by the matrix.
+  gl_Position = u_matrix * a_position;
+
+  // Pass the texcoord to the fragment shader.
+  v_texcoord = a_texcoord;
+}
+</script>
+<!-- fragment shader -->
+<script id="3d-fragment-shader" type="x-shader/x-fragment">
+precision mediump float;
+
+// Passed in from the vertex shader.
+varying vec2 v_texcoord;
+
+// The texture.
+uniform sampler2D u_texture;
+
+void main() {
+   gl_FragColor = texture2D(u_texture, v_texcoord);
+}
+</script>
+
+</head>
+<body>
+    <script type="text/javascript" src="js/phaser-ce-2.7.5/build/phaser.js"></script>
+    <script type="text/javascript" src="windows/WindowFrame.js"></script>
+    <script type="text/javascript" src="windows/TextButton.js"></script>
+    <script type="text/javascript" src="windows/TextBox.js"></script>
+    <script type="text/javascript" src="concepts/Agent.js"></script>
+    <script type="text/javascript" src="concepts/Pc.js"></script>
+    <script type="text/javascript" src="concepts/Monster.js"></script>
+    <script type="text/javascript" src="concepts/Party.js"></script>
+    <script type="text/javascript" src="concepts/Map.js"></script>
+    <script type="text/javascript" src="concepts/Encounter.js"></script>
+    <script type="text/javascript" src="concepts/EquipItem.js"></script>
+    <script type="text/javascript" src="concepts/Spell.js"></script>
+    <script type="text/javascript" src="events/MapEvent.js"></script>
+    <script type="text/javascript" src="events/PortalEvent.js"></script>
+    <script type="text/javascript" src="events/ShopEvent.js"></script>
+    <script type="text/javascript" src="events/TreasureEvent.js"></script>
+    <script type="text/javascript" src="events/TrainerEvent.js"></script>
+    <script type="text/javascript" src="events/TempleEvent.js"></script>
+    <script type="text/javascript" src="events/InnEvent.js"></script>
+    <script type="text/javascript" src="data/MonsterData.js"></script>
+    <script type="text/javascript" src="data/MapData.js"></script>
+    <script type="text/javascript" src="data/TerrainData.js"></script>
+    <script type="text/javascript" src="data/ItemData.js"></script>
+    <script type="text/javascript" src="data/WallData.js"></script>
+    <script type="text/javascript" src="data/SpellData.js"></script>
+    <script type="text/javascript" src="data/ClassData.js"></script>
+    <script type="text/javascript" src="data/StatusData.js"></script>
+    <script type="text/javascript" src="display/ViewDisplay.js"></script>
+    <script type="text/javascript" src="display/MiniMap.js"></script>
+    <script type="text/javascript" src="display/MainFrame.js"></script>
+    <script type="text/javascript" src="display/GenericListItem.js"></script>
+    <script type="text/javascript" src="display/GenericList.js"></script>
+    <script type="text/javascript" src="display/InventoryListItem.js"></script>
+    <script type="text/javascript" src="display/InventoryList.js"></script>
+    <script type="text/javascript" src="display/SpellListItem.js"></script>
+    <script type="text/javascript" src="display/SpellList.js"></script>
+    <script type="text/javascript" src="display/ActionListItem.js"></script>
+    <script type="text/javascript" src="display/ActionList.js"></script>
+    <script type="text/javascript" src="display/ClassListItem.js"></script>
+    <script type="text/javascript" src="display/ProjectionTools.js"></script>
+    <script type="text/javascript" src="display/ProjectedTile.js"></script>
+    <script type="text/javascript" src="display/ProjectedWall.js"></script>
+    <script type="text/javascript" src="display/TileFactory.js"></script>
+    <script type="text/javascript" src="display/WallFactory.js"></script>
+    <script type="text/javascript" src="display/bars/HpBar.js"></script>
+    <script type="text/javascript" src="display/bars/StaBar.js"></script>
+    <script type="text/javascript" src="windows/Window.js"></script>
+    <script type="text/javascript" src="windows/StartWindow.js"></script>
+    <script type="text/javascript" src="windows/PcInfoWindow.js"></script>
+    <script type="text/javascript" src="windows/EncounterWindow.js"></script>
+    <script type="text/javascript" src="windows/EventWindow.js"></script>
+    <script type="text/javascript" src="windows/ShopWindow.js"></script>
+    <script type="text/javascript" src="windows/TrainerWindow.js"></script>
+    <script type="text/javascript" src="windows/MainFrameWindow.js"></script>
+    <script type="text/javascript" src="windows/QuickActionSelectWindow.js"></script>
+    <script type="text/javascript" src="windows/OptionsWindow.js"></script>
+    <script type="text/javascript" src="windows/MapWindow.js"></script>
+    <script type="text/javascript" src="windows/TempleWindow.js"></script>
+    <script type="text/javascript" src="windows/InnWindow.js"></script>
+
+<script type="text/javascript">
+
+    var gameElt = document.getElementById('game');
+    var mmGame = new Phaser.Game(MainFrame.GAME_WIDTH, MainFrame.GAME_HEIGHT, Phaser.AUTO, 'game', { preload: preload, create: create, update: update});
+    
+    // map data
+    var pcParty;
+    
+    //display
+    var viewDisplay;
+    var miniMap;
+    var mainFrame;
+    
+    // character data
+    var pcs;
+    
+    // controls
+    var processedClick = false;
+    var processedKeyPress = false;
+    var allEEsProcessed = true;
+    var eventProcessed = false;
+    var allTilesAndWallsCreated = false;
+    
+    // windows
+    var pcInfoWindow;
+    var encounterWindow;
+    var eventWindow;
+    var shopWindow;
+    var trainerWindow;
+    var mainFrameWindow;
+    var quickActionSelectWindow;
+    var optionsWindow;
+    var mapWindow;
+    var startWindow;
+    var templeWindow;
+    
+    var tileFactory;
+    
+    var clickableObjects;
+    
+    var canvas;
+    
+    //"use strict";
+    //document.getElementById("canvas").style.display="none";
+    
+    function preload() {
+        mmGame.load.image('sky', 'assets/sky.png');
+        mmGame.load.image('caveCeiling', 'assets/caveCeiling.png');
+        //mmGame.load.image('star', 'assets/star.png');
+        mmGame.load.spritesheet('terrain', 'assets/terrain.png', 200, 200);
+        // sources: https://opengameart.org/content/glitch-background-assets
+        mmGame.load.spritesheet('events', 'assets/events.png', 200, 200);
+        // sources: clipartix 26347, and based on 26386
+        mmGame.load.image('diamond', 'assets/diamond.png');
+        //mmGame.load.image('chest', 'assets/chest.png'); // Pixel Chest and Money (REDO) - opengameart.org
+        mmGame.load.spritesheet('minimapArrow', 'assets/arrow.png', 20, 20);
+        mmGame.load.spritesheet('minimapSquare', 'assets/minimapSquares.png', 20, 20);
+        mmGame.load.spritesheet('portrait', 'assets/portraits2.png', 35, 35);
+        mmGame.load.spritesheet('monsters', 'assets/monsters.png', 32, 32);
+        mmGame.load.spritesheet('dude', 'assets/dude.png', 32, 32);
+        mmGame.load.spritesheet('item', 'assets/ItemIcons.png', 20, 20);
+        mmGame.load.spritesheet('spellIcon', 'assets/spellIcon.png', 16, 16);
+        mmGame.load.spritesheet('class', 'assets/Classes2.png', 32, 32);
+        mmGame.load.spritesheet('smallArrow', 'assets/smallArrow.png', 20, 20);
+        mmGame.load.spritesheet('statusIcon', 'assets/statusIcons.png', 16, 16);
+        mmGame.load.spritesheet('damageEffect', 'assets/damageEffect.png', 32, 32);
+        mmGame.load.spritesheet('missiles', 'assets/missiles2.png', 32, 32);
+        
+        tileFactory = new TileFactory(mmGame);
+        wallFactory = new WallFactory(mmGame);
+    }
+    
+    function create() {
+        createWorld();
+    }
+
+    function createWorld() {
+        pcParty = new Party();
+        pcParty.createSampleParty();
+        pcParty.x = 7;
+        pcParty.y = 12;
+        pcParty.dir = 0;
+        pcParty.members[0].curHp = pcParty.members[0].maxHp/2;
+        pcParty.members[5].curSta = pcParty.members[5].maxSta/2;
+        
+        pcParty.maps = [];
+        for(var k=0; k<MapData.DATA.length; k++) {
+            pcParty.maps.push(new Map(pcParty));
+            pcParty.maps[k].loadMap(MapData.DATA[k][0]);
+            pcParty.maps[k].loadMonsters(MapData.DATA[k][0]);
+            pcParty.maps[k].loadEvents(MapData.DATA[k][0]);
+        }
+        
+        pcParty.cMap = pcParty.maps[1];
+        pcParty.cMap.updateMonsterGrid();
+        pcParty.cMap.updateEventGrid();
+        pcParty.maps[1].explore(pcParty.x, pcParty.y);
+    }
+    
+    function createTiles() {
+        viewDisplay = new ViewDisplay(mmGame, pcParty);
+        tileFactory.createSprites(viewDisplay);
+        //tileFactory = new TileFactory(mmGame, viewDisplay);
+        //wallFactory = new WallFactory(mmGame, viewDisplay);
+        clickableObjects = [];
+    }
+    
+    function createUi() {
+        
+        viewDisplay.createViewObjects();
+        
+        mainFrame = new MainFrame(mmGame, pcParty);
+        
+        // windows
+        clickableObjects.push(mainFrame);
+        
+        mainFrameWindow = new MainFrameWindow(mmGame, 435, 240, pcParty, mainFrame, viewDisplay);
+        clickableObjects.push(mainFrameWindow);
+        
+        miniMap = new MiniMap(mmGame, pcParty);
+        miniMap.createMiniMap();
+        
+        encounterWindow = new EncounterWindow(mmGame, 390, 10, mainFrame, viewDisplay);
+        encounterWindow.setVisible(false);
+        clickableObjects.push(encounterWindow);
+        
+        eventWindow = new EventWindow(mmGame, 100, 100);
+        eventWindow.setVisible(false);
+        clickableObjects.push(eventWindow);
+        
+        shopWindow = new ShopWindow(mmGame, 50, 80, mainFrame);
+        shopWindow.setVisible(false);
+        clickableObjects.push(shopWindow);
+        
+        trainerWindow = new TrainerWindow(mmGame, 100, 100, mainFrame);
+        trainerWindow.setVisible(false);
+        clickableObjects.push(trainerWindow);
+                
+        mapWindow = new MapWindow(mmGame, 120, 25);
+        mapWindow.setVisible(false);
+        clickableObjects.push(mapWindow); //6
+        
+        pcInfoWindow = new PcInfoWindow(mmGame, 100, 100, mainFrame);
+        pcInfoWindow.setVisible(false);
+        clickableObjects.push(pcInfoWindow);
+        
+        quickActionSelectWindow = new QuickActionSelectWindow(mmGame, 150, 110);
+        quickActionSelectWindow.setVisible(false);
+        pcInfoWindow.setQuickActionSelectWindow(quickActionSelectWindow);
+        clickableObjects.push(quickActionSelectWindow);
+        
+        optionsWindow = new OptionsWindow(mmGame, 100, 100, pcParty, viewDisplay, mainFrame, miniMap);
+        optionsWindow.setVisible(false);
+        clickableObjects.push(optionsWindow);
+        
+        templeWindow = new TempleWindow(mmGame, 100, 100);
+        templeWindow.setVisible(false);
+        clickableObjects.push(templeWindow);
+        
+        mainFrame.setMainFrameWindow(mainFrameWindow);
+        mainFrame.setEncounterWindow(encounterWindow);
+        mainFrame.setPcInfoWindow(pcInfoWindow);
+        
+        mainFrameWindow.setOptionsWindow(optionsWindow);
+        mainFrameWindow.setMapWindow(mapWindow);
+        
+        startWindow = new StartWindow(mmGame, 200, 120, pcParty);
+        clickableObjects.push(startWindow);
+    }
+    
+    function updateElements() {
+        viewDisplay.updateMissile();
+        var mouseOverObject = -1;
+        for(var i=0;i<clickableObjects.length;i++) {
+            clickableObjects[i].update();
+        }
+    }
+    
+    function isAnyEEWindowVisible() {
+        return startWindow.visible || encounterWindow.visible || eventWindow.visible || shopWindow.visible || trainerWindow.visible || mapWindow.visible;
+    }
+     
+    function update() {
+        if(!allTilesAndWallsCreated) {
+            //console.log(wallFactory.finished);
+            if(!wallFactory.finished) {
+                if(!tileFactory.finished) {
+                    tileFactory.update();
+                } else {
+                    wallFactory.update();
+                }
+            } else {
+                createTiles();
+                createUi();
+                allTilesAndWallsCreated = true;
+            }
+        } else {
+            updateElements();
+
+            // check for save game reload
+            if(optionsWindow.reloadScheduled || startWindow.reloadScheduled) {
+                mainFrame.reload();
+                miniMap.updateMinimap();
+                viewDisplay.updateView();
+                optionsWindow.reloadScheduled = false;
+                startWindow.reloadScheduled = false;
+            }
+
+            // mouse
+            if(!processedClick && mmGame.input.mousePointer.isDown) {
+                processedClick = true;
+                var clickedObject = -1;
+                for(var i=0;i<clickableObjects.length;i++) {
+                    if(clickableObjects[i].isMouseOver()) {clickedObject = i;}
+                }
+                if(clickedObject > -1) clickableObjects[clickedObject].handleMouseDown();
+            }
+            if(processedClick && !mmGame.input.mousePointer.isDown) {
+                processedClick = false;
+                var clickedObject = -1;
+                for(var i=0;i<clickableObjects.length;i++) {
+                    clickableObjects[i].handleMouseUp();
+                }
+            }
+
+            if(!isAnyEEWindowVisible()) {
+                // keys
+                var dx =0; var dy = 0; var dd = 0;
+                if (mmGame.input.keyboard.isDown(Phaser.Keyboard.W) || mmGame.input.keyboard.isDown(Phaser.Keyboard.UP)){
+                    if(!processedKeyPress) {
+                        if(pcParty.dir == 0) dy = -1;
+                        if(pcParty.dir == 1) dx = 1;
+                        if(pcParty.dir == 2) dy = 1;
+                        if(pcParty.dir == 3) dx = -1;
+                    }
+                    processedKeyPress = true;
+                } else if (mmGame.input.keyboard.isDown(Phaser.Keyboard.S) || mmGame.input.keyboard.isDown(Phaser.Keyboard.DOWN)) {
+                    if(!processedKeyPress) {
+                        if(pcParty.dir == 0) dy = 1;
+                        if(pcParty.dir == 1) dx = -1;
+                        if(pcParty.dir == 2) dy = -1;
+                        if(pcParty.dir == 3) dx = 1;
+                    }
+                    processedKeyPress = true;
+                } else if (mmGame.input.keyboard.isDown(Phaser.Keyboard.A) || mmGame.input.keyboard.isDown(Phaser.Keyboard.LEFT)) {
+                    if(!processedKeyPress) {
+                        dd = -1;
+                    }
+                    processedKeyPress = true;
+                } else if (mmGame.input.keyboard.isDown(Phaser.Keyboard.D) || mmGame.input.keyboard.isDown(Phaser.Keyboard.RIGHT)) {
+                    if(!processedKeyPress) {
+                        dd = 1;
+                    }
+                    processedKeyPress = true;
+                } else if(mmGame.input.keyboard.isDown(Phaser.Keyboard.ENTER)) {
+                    if(!processedKeyPress) {
+                        if(pcInfoWindow.visible) {
+                            // close PC info window
+                            if(pcInfoWindow.buttons[0].active) {pcInfoWindow.buttons[0].activateFunction();}
+                        }
+                    }
+                    processedKeyPress = true;
+                } else {
+                    processedKeyPress = false;
+                }
+                // process the key input
+                if(dx != 0 || dy != 0 || dd != 0) {
+                    if(dd != 0) {
+                        pcParty.dir = (pcParty.dir + dd) % 4;
+                        if(pcParty.dir == -1) pcParty.dir = 3;
+                        if(pcParty.dir == pcParty.resetEventDirection) {
+                            eventProcessed = false;
+                            allEEsProcessed = false;
+                        }
+                    }
+                    if(dx != 0 || dy != 0) {
+                        if(pcParty.cMap.isMoveValid(pcParty.x, pcParty.y, dx, dy)) {
+                            pcParty.x += dx;
+                            pcParty.y += dy;
+                            pcParty.minutesSpent += pcParty.cMap.minutesPerStep;
+                            pcParty.processMove(pcParty.cMap.minutesPerStep);
+                            mainFrame.reload();
+                            pcParty.cMap.moveMonsters();
+                            eventProcessed = false;
+                            allEEsProcessed = false;
+                            pcParty.resetEventDirection = pcParty.dir;
+                            pcParty.cMap.explore(pcParty.x, pcParty.y);
+                        }
+                    }
+
+                    miniMap.updateMinimap();
+                    viewDisplay.updateView();
+                }
+            } else {
+                // hotkeys
+                if(mmGame.input.keyboard.isDown(Phaser.Keyboard.ENTER)) {
+                    if(!processedKeyPress) {
+                        if(startWindow.visible) {
+                            startWindow.buttons[0].activateFunction();
+                        } else if(pcInfoWindow.visible) {
+                            // close PC info window
+                            if(pcInfoWindow.buttons[0].active) {pcInfoWindow.buttons[0].activateFunction();}
+                        } else if(eventWindow.visible) {
+                            // "OK" if event is triggered
+                            if(eventWindow.buttons[0].active) {eventWindow.buttons[0].activateFunction();}
+                        } else if(shopWindow.visible) {
+                            // "Leave" in shop
+                            if(shopWindow.buttons[0].active) {shopWindow.buttons[0].activateFunction();}
+                        } else if(trainerWindow.visible) {
+                            // "Leave" in training hall
+                            if(trainerWindow.buttons[0].active) {trainerWindow.buttons[0].activateFunction();}
+                        } else if(encounterWindow.visible) {
+                            // try quick action, strike or shoot if in combat
+                            if(encounterWindow.buttons[0].active) {encounterWindow.buttons[0].activateFunction();}
+                            else if(encounterWindow.buttons[1].active) {encounterWindow.buttons[1].activateFunction();}
+                            else if(encounterWindow.buttons[3].active) {encounterWindow.buttons[3].activateFunction();}
+                        }
+                        processedKeyPress = true;
+                    }
+                } else if(mmGame.input.keyboard.isDown(Phaser.Keyboard.BACKSPACE)) {
+                    if(eventWindow.visible) {
+                        // "OK" if event is triggered
+                        if(eventWindow.buttons[1].active) {eventWindow.buttons[1].activateFunction();}
+                    }
+                } else {
+                    processedKeyPress = false;
+                }
+            }
+
+            // rest
+            if(mainFrameWindow.restCount > 0) {
+                pcParty.cMap.moveMonsters();
+                pcParty.cMap.updateMonsterGrid();
+                mainFrameWindow.restCount -= 1;
+                pcParty.minutesSpent += Map.MINUTES_PER_REST_STEP;
+                pcParty.processMove(Map.MINUTES_PER_REST_STEP);
+                mainFrame.reload();
+                if(pcParty.cMap.monsterEncounter()) {
+                    mainFrameWindow.restCount = 0;
+                    allEEsProcessed = false;
+                } else {
+                    if(mainFrameWindow.restCount == 0) {
+                        pcParty.completeRest();
+                    }
+                }
+                viewDisplay.updateView();
+                mainFrame.reload();
+            }
+
+            // events
+            if(!allEEsProcessed && !isAnyEEWindowVisible()) {
+                allEEsProcessed = true;
+                if(pcParty.cMap.monsterEncounter()) {
+                    encounterWindow.setVisible(true);
+                    encounterWindow.loadEncounter(pcParty.cMap);
+                    allEEsProcessed = false;
+                }
+                var event = pcParty.cMap.getTriggeredEvent();
+                if(event != null && !eventProcessed && allEEsProcessed) {
+                    console.log("event! "+event.x+", "+event.y);
+                    if(event.type == "portal") {
+                        var idx = -1
+                        for(var k=0; k < MapData.DATA.length; k++) {
+                            if(MapData.DATA[k][0] == event.newMapString) idx = k;
+                        }
+                        if(idx == -1) console.log("Error, incorrect map name: "+event.newMapString);
+                        event.newMap = pcParty.maps[idx];
+                    } else if(event.type == "shop") {
+                        event.shopWindow = shopWindow;
+                    } else if(event.type == "trainer") {
+                        event.trainerWindow = trainerWindow;
+                    } else if(event.type == "temple") {
+                        event.templeWindow = templeWindow;
+                    } else if(event.type == "inn") {
+                        event.innWindow = innWindow;
+                    }
+                    eventProcessed = true;
+                    eventWindow.setVisible(true);
+                    eventWindow.loadEvent(event, pcParty.cMap, viewDisplay, miniMap, mainFrame);
+                    allEEsProcessed = false;
+                }
+                pcParty.cMap.updateEventGrid();
+            }
+        }
+    }
+
+</script>
+</body>
+</html>
